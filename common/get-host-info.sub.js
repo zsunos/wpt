@@ -2,7 +2,7 @@ function get_host_info() {
   const HTTP_PORT = '{{ports[http][0]}}';
   const HTTP_PORT2 = '{{ports[http][1]}}';
   const HTTPS_PORT = '{{ports[https][0]}}';
-  const H2_PORT = '??'; // TODO
+  const H2_PORT = '{{ports[http2][0]}}';
   const ORIGINAL_HOST = '{{host}}';
   const REMOTE_HOST = (ORIGINAL_HOST === 'localhost') ? '127.0.0.1' : ('www1.' + ORIGINAL_HOST);
   const OTHER_HOST = '{{domains[www2]}}';
