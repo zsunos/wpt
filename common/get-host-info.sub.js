@@ -1,22 +1,24 @@
 function get_host_info() {
-
-  var HTTP_PORT = '{{ports[http][0]}}';
-  var HTTP_PORT2 = '{{ports[http][1]}}';
-  var HTTPS_PORT = '{{ports[https][0]}}';
-  var ORIGINAL_HOST = '{{host}}';
-  var REMOTE_HOST = (ORIGINAL_HOST === 'localhost') ? '127.0.0.1' : ('www1.' + ORIGINAL_HOST);
-  var OTHER_HOST = '{{domains[www2]}}';
-  var NOTSAMESITE_HOST = (ORIGINAL_HOST === 'localhost') ? '127.0.0.1' : ('not-' + ORIGINAL_HOST);
+  const HTTP_PORT = '{{ports[http][0]}}';
+  const HTTP_PORT2 = '{{ports[http][1]}}';
+  const HTTPS_PORT = '{{ports[https][0]}}';
+  const H2_PORT = '??'; // TODO
+  const ORIGINAL_HOST = '{{host}}';
+  const REMOTE_HOST = (ORIGINAL_HOST === 'localhost') ? '127.0.0.1' : ('www1.' + ORIGINAL_HOST);
+  const OTHER_HOST = '{{domains[www2]}}';
+  const NOTSAMESITE_HOST = (ORIGINAL_HOST === 'localhost') ? '127.0.0.1' : ('not-' + ORIGINAL_HOST);
 
   return {
     HTTP_PORT: HTTP_PORT,
     HTTP_PORT2: HTTP_PORT2,
     HTTPS_PORT: HTTPS_PORT,
+    H2_PORT: H2_PORT,
     ORIGINAL_HOST: ORIGINAL_HOST,
     REMOTE_HOST: REMOTE_HOST,
 
     HTTP_ORIGIN: 'http://' + ORIGINAL_HOST + ':' + HTTP_PORT,
     HTTPS_ORIGIN: 'https://' + ORIGINAL_HOST + ':' + HTTPS_PORT,
+    H2_ORIGIN: 'https://' + ORIGINAL_HOST + ':' + H2_PORT,
     HTTPS_ORIGIN_WITH_CREDS: 'https://foo:bar@' + ORIGINAL_HOST + ':' + HTTPS_PORT,
     HTTP_ORIGIN_WITH_DIFFERENT_PORT: 'http://' + ORIGINAL_HOST + ':' + HTTP_PORT2,
     HTTP_REMOTE_ORIGIN: 'http://' + REMOTE_HOST + ':' + HTTP_PORT,

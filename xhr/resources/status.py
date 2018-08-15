@@ -5,5 +5,6 @@ def main(request, response):
     type = request.GET.first("type", "")
     status = (code, text)
     headers = [("Content-Type", type),
-               ("X-Request-Method", request.method)]
+               ("X-Request-Method", request.method),
+               ("Access-Control-Allow-Origin", "*")] # Needed for H2 tests
     return status, headers, content
