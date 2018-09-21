@@ -3107,9 +3107,16 @@ IdlInterfaceMember.prototype.is_to_json_regular_operation = function() {
 };
 
 IdlInterfaceMember.prototype.toString = function() {
+    function formatType(type) {
+        if (type.generic) {
+            return type.generic + "<" + formatType(type.idlType) + ">";
+        }
+        return type.idlType;
+    }
+
     if (this.type === "operation") {
         var args = this.arguments.map(function(m) {
-            return m.idlType.idlType;
+            return formatType(m.idlType);
         }).join(", ");
         return this.name + "(" + args + ")";
     }
