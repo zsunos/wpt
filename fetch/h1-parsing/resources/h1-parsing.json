@@ -1,0 +1,44 @@
+[
+  {
+    "description": "CR after status",
+    "message": "HTTP/1.1 444 OK\u000DContent-Type: text/plain\u000A\u000ABODY",
+    "status": 444,
+    "statusText": "OK",
+    "headers": [
+      ["content-type", "text/plain"]
+    ],
+    "body": "BODY"
+  },
+  {
+    "description": "CR after status and headers",
+    "message": "HTTP/1.1 444 OK\u000DContent-Type: text/plain\u000D\u000DBODY",
+    "status": 444,
+    "statusText": "OK",
+    "headers": [
+      ["content-type", "text/plain"]
+    ],
+    "body": "BODY"
+  },
+  {
+    "description": "CR between headers",
+    "message": "HTTP/1.1 444 OK\u000AContent-Type: text/plain\u000Dis-mir:egal\u000A\u000ABODY",
+    "status": 444,
+    "statusText": "OK",
+    "headers": [
+      ["content-type", "text/plain"],
+      ["is-mir", "egal"]
+    ],
+    "body": "BODY"
+  },
+  {
+    "description": "CR after status and between headers",
+    "message": "HTTP/1.1 444 OK\u000DContent-Type: text/plain\u000Dis-mir:egal\u000A\u000ABODY",
+    "status": 444,
+    "statusText": "OK",
+    "headers": [
+      ["content-type", "text/plain"],
+      ["is-mir", "egal"]
+    ],
+    "body": "BODY"
+  }
+]
