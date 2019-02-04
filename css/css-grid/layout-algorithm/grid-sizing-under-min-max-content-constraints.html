@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>CSS Grid Layout Test: sizing under min/max-content constraints</title>
+<link rel="author" title="Oriol Brufau" href="mailto:obrufau@igalia.com">
+<link rel="help" href="https://drafts.csswg.org/css-grid/#layout-algorithm" title="11. Grid Sizing">
+<meta name="assert" content="Checks grid sizing under min/max-content constraints">
+<style>
+.grid {
+  display: inline-grid;
+  border-style: solid;
+  border-width: 1px 2px 3px 4px;
+  padding: 5px 6px 7px 8px;
+}
+.item {
+  border-style: solid;
+  border-width: 1px 2px 3px 4px;
+  padding: 5px 6px 7px 8px;
+}
+.item::before, .item::after {
+  content: "";
+  height: 50px;
+  width: 50px;
+  float: left;
+  background: orange;
+}
+</style>
+
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+
+<div id="log"></div>
+
+<script>
+"use strict";
+
+const minContentSize = 50;
+const maxContentSize = 100;
+const inlinePaddingsAndBorders = 2 + 4 + 6 + 8;
+const blockPaddingsAndBorders = 1 + 3 + 5 + 7;
+const minWidths = ["auto", 0, "10%"];
+const widths = ["auto", 0, "10%"];
+const containerSizes = [
+  0,
+  "min-content",
+  (minContentSize + maxContentSize) / 2 + inlinePaddingsAndBorders * 2,
+  "max-content",
+  100 + maxContentSize + inlinePaddingsAndBorders * 2,
+];
+const trackSizes = {
+  "auto": ["auto", "max-content"],
+  "min-content": ["min-content", "min-content"],
+  "max-content": ["max-content", "max-content"],
+  "minmax(auto, min-content)": ["auto", "min-content"],
+  "minmax(min-content, max-content)": ["min-content", "max-content"],
+  "minmax(max-content, min-content)": ["max-content", "min-content"],
+  "minmax(0px, 150px)": [0, 150],
+  "minmax(25px, 75px)": [25, 75],
+  "minmax(25%, 75%)": ["25%", "75%"],
+  "minmax(0%, 200%)": ["0%", "200%"],
+  "minmax(auto, 10%)": ["auto", "10%"],
+  "minmax(min-content, 10%)": ["min-content", "10%"],
+  "minmax(max-content, 10%)": ["max-content", "10%"],
+  "fit-content(0px)": ["auto", "max-content", 0],
+  "fit-content(25px)": ["auto", "max-content", 25],
+  "fit-content(150px)": ["auto", "max-content", 150],
+  "fit-content(0%)": ["auto", "max-content", "0%"],
+  "fit-content(50%)": ["auto", "max-content", "50%"],
+};
+
+function assertTolerance(actual, expected, message) {
+  if (isNaN(expected) || Math.abs(actual - expected) >= 1) {
+    assert_equals(actual, Number(expected), message);
+  }
+}
+
+function isLength(value) {
+  return typeof value == "number";
+}
+
+function resolvePercentages(size, percentageReference, fallback) {
+  if (typeof size == "string" && size.endsWith("%")) {
+    if (isLength(percentageReference)) {
+      return percentageReference * Number(size.slice(0, -1)) / 100;
+    }
+    return fallback;
+  }
+  return size;
+}
+
+function minSize({track, minWidth, width, gridSize}, trackSize) {
+  if (minWidth != "auto") {
+    return resolvePercentages(minWidth, trackSize, 0);
+  }
+  const [rawTrackMinSize, rawTrackMaxSize] = track;
+  if (resolvePercentages(rawTrackMinSize, gridSize, "auto") != "auto") {
+    return 0;
+  }
+  let value = resolvePercentages(width, trackSize, null);
+  value = isLength(value) ? value : minContentSize;
+  const trackMaxSize = resolvePercentages(rawTrackMaxSize, gridSize, null);
+  if (isLength(trackMaxSize)) {
+    const stretchFitSize = Math.max(trackMaxSize - inlinePaddingsAndBorders, 0);
+    return Math.min(value, stretchFitSize);
+  }
+  return value;
+}
+
+function minContentContribution({width, minWidth}) {
+  let value = isLength(width) ? width : minContentSize;
+  value = isLength(minWidth) ? Math.max(value, minWidth) : value;
+  return value + inlinePaddingsAndBorders;
+}
+
+function maxContentContribution({width, minWidth}) {
+  let value = isLength(width) ? width : maxContentSize;
+  value = isLength(minWidth) ? Math.max(value, minWidth) : value;
+  return value + inlinePaddingsAndBorders;
+}
+
+function sizingAlgorithm(params) {
+  const {gridSize, width} = params;
+  const [rawTrackMinSize, rawTrackMaxSize, rawfitContent] = params.track;
+  const trackMinSize = resolvePercentages(rawTrackMinSize, gridSize, "auto");
+  const trackMaxSize = resolvePercentages(rawTrackMaxSize, gridSize, "max-content");
+  const fitContent = resolvePercentages(rawfitContent, gridSize, null);
+
+  //  Initialize Track Sizes
+  let baseSize = isLength(trackMinSize) ? trackMinSize : 0;
+  let growthLimit = isLength(trackMaxSize) ? trackMaxSize : Infinity;
+  growthLimit = Math.max(growthLimit, baseSize);
+
+  // Resolve Intrinsic Track Sizes
+  switch (trackMinSize) {
+    case "min-content":
+      baseSize = minContentContribution(params);
+      break;
+    case "max-content":
+      baseSize = maxContentContribution(params);
+      break;
+    case "auto":
+      const minContribution =
+        width == "auto" ? minSize(params, null) + inlinePaddingsAndBorders :
+        minContentContribution(params);
+      if (!isLength(gridSize)) {
+        if (gridSize == "min-content" || trackMaxSize == "min-content") {
+          baseSize = minContentContribution(params);
+        } else {
+          baseSize = maxContentContribution(params);
+        }
+        if (isLength(trackMaxSize)) {
+          baseSize = Math.min(baseSize, trackMaxSize);
+        } else if (isLength(fitContent)) {
+          baseSize = Math.min(baseSize, fitContent);
+        }
+        baseSize = Math.max(baseSize, minContribution);
+        break;
+      } else {
+        baseSize = minContribution;
+      }
+  }
+  switch (trackMaxSize) {
+    case "min-content":
+      growthLimit = minContentContribution(params);
+      break;
+    case "max-content":
+      growthLimit = maxContentContribution(params);
+      if (isLength(fitContent)) {
+        growthLimit = Math.min(growthLimit, fitContent);
+      }
+      break;
+  }
+  growthLimit = Math.max(growthLimit, baseSize);
+
+  // Maximize Tracks
+  const freeSpace =
+    gridSize == "min-content" ? 0 :
+    gridSize == "max-content" ? Infinity :
+    gridSize - baseSize;
+  if (freeSpace > 0) {
+    baseSize = Math.min(baseSize + freeSpace, growthLimit);
+  }
+  return baseSize;
+}
+
+function check(params) {
+  const {containerSize, item, grid, width, container} = params;
+
+  // Lay out the grid container under min/max-content constraints to find its size
+  let gridInlineSize;
+  switch (containerSize) {
+    case "max-content":
+      gridInlineSize = sizingAlgorithm({...params, gridSize: "max-content"});
+      break;
+    case "min-content":
+      gridInlineSize = sizingAlgorithm({...params, gridSize: "min-content"});
+      break;
+    default:
+      const availableSpace = Math.max(containerSize - inlinePaddingsAndBorders, 0);
+      gridInlineSize = sizingAlgorithm({...params, gridSize: "max-content"});
+      if (gridInlineSize > availableSpace) {
+        gridInlineSize = sizingAlgorithm({...params, gridSize: "min-content"});
+        if (gridInlineSize < availableSpace) {
+          gridInlineSize = availableSpace;
+        }
+      }
+      break;
+  }
+
+  // Now lay it out "for real" with that size
+  params.gridSize = gridInlineSize;
+  const trackSize = sizingAlgorithm(params);
+  let itemInlineSize = width != "auto" ? resolvePercentages(width, trackSize) :
+                       Math.max(trackSize - inlinePaddingsAndBorders, 0);
+  itemInlineSize = Math.max(itemInlineSize, minSize(params, trackSize));
+  itemInlineSize += inlinePaddingsAndBorders;
+
+  // Check sizes
+  test(function() {
+    const {outerHTML} = container;
+    const itemBlockSize =
+      (itemInlineSize >= maxContentSize ? minContentSize : maxContentSize)
+      + blockPaddingsAndBorders;
+    assertTolerance(item.offsetWidth, itemInlineSize, `Item width in ${outerHTML}`);
+    assertTolerance(item.offsetHeight, itemBlockSize, `Item height ${outerHTML}`);
+    assertTolerance(grid.offsetWidth, gridInlineSize + inlinePaddingsAndBorders,
+                    `Grid width ${outerHTML}`);
+    assertTolerance(grid.offsetHeight, itemBlockSize + blockPaddingsAndBorders,
+                    `Grid height ${outerHTML}`);
+    assert_equals(getComputedStyle(grid).gridTemplateColumns, trackSize + "px",
+                  `Column size ${outerHTML}`);
+  }, `Grid #${i}`);
+}
+
+let i = 0;
+for (const containerSize of containerSizes) {
+  for (const [trackStyle, track] of Object.entries(trackSizes)) {
+    for (const minWidth of minWidths) {
+      for (const width of widths) {
+        ++i;
+        const container = document.createElement("div");
+        container.className = "container";
+        if (isLength(containerSize)) {
+          container.style.width = containerSize + "px";
+        } else {
+          container.style.width = "-webkit-" + containerSize;
+          container.style.width = "-moz-" + containerSize;
+          container.style.width = containerSize;
+        }
+
+        const grid = document.createElement("div");
+        grid.className = "grid";
+        grid.style.gridTemplateColumns = trackStyle;
+
+        const item = document.createElement("div");
+        item.className = "item";
+        item.style.minWidth = isLength(minWidth) ? minWidth + "px" : minWidth;
+        item.style.width = isLength(width) ? width + "px" : width;
+
+        grid.appendChild(item);
+        container.appendChild(grid);
+        document.body.appendChild(container);
+        check({track, minWidth, width, item, grid, containerSize, container});
+        container.remove();
+      }
+    }
+  }
+}
+</script>
