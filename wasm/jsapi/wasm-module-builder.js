@@ -66,6 +66,7 @@ let kStartSectionCode = 8;       // Start function declaration
 let kElementSectionCode = 9;     // Elements section
 let kCodeSectionCode = 10;       // Function code
 let kDataSectionCode = 11;       // Data segments
+let kEventSectionCode = 13;      // Event section (between Global & Export)
 
 // Name section types
 let kModuleNameCode = 0;
@@ -99,6 +100,8 @@ let kExternalGlobal = 3;
 
 let kTableZero = 0;
 let kMemoryZero = 0;
+
+let kExceptionAttribute = 0;
 
 // Useful signatures
 let kSig_i_i = makeSig([kWasmI32], [kWasmI32]);
@@ -329,6 +332,7 @@ let kExprI32ReinterpretF32 = 0xbc;
 let kExprI64ReinterpretF64 = 0xbd;
 let kExprF32ReinterpretI32 = 0xbe;
 let kExprF64ReinterpretI64 = 0xbf;
+let kExprRefNull = 0xd0;
 
 class Binary {
   constructor() {
@@ -497,6 +501,7 @@ class WasmModuleBuilder {
     this.imports = [];
     this.exports = [];
     this.globals = [];
+    this.exceptions = [];
     this.functions = [];
     this.table_length_min = 0;
     this.table_length_max = undefined;
@@ -538,6 +543,13 @@ class WasmModuleBuilder {
     return glob;
   }
 
+  addException(type) {
+    let type_index = (typeof type) == "number" ? type : this.addType(type);
+    let except_index = this.exceptions.length + this.num_imported_exceptions;
+    this.exceptions.push(type_index);
+    return except_index;
+  }
+
   addFunction(name, type) {
     let type_index = (typeof type) == "number" ? type : this.addType(type);
     let func = new WasmFunctionBuilder(this, name, type_index);
@@ -571,6 +583,16 @@ class WasmModuleBuilder {
     let o = {module: module, name: name, kind: kExternalTable, initial: initial,
              maximum: maximum};
     this.imports.push(o);
+  }
+
+  addImportedException(module, name, type) {
+    if (this.exceptions.length != 0) {
+      throw new Error('Imported exceptions must be declared before local ones');
+    }
+    let type_index = (typeof type) == "number" ? type : this.addType(type);
+    let o = {module: module, name: name, kind: kExternalException, type: type_index};
+    this.imports.push(o);
+    return this.num_imported_exceptions++;
   }
 
   addExport(name, index) {
@@ -673,6 +695,9 @@ class WasmModuleBuilder {
             section.emit_u8(has_max ? 1 : 0); // flags
             section.emit_u32v(imp.initial); // initial
             if (has_max) section.emit_u32v(imp.maximum); // maximum
+          } else if (imp.kind == kExternalException) {
+            section.emit_u32v(kExceptionAttribute);
+            section.emit_u32v(imp.type);
           } else {
             throw new Error("unknown/unsupported import kind " + imp.kind);
           }
@@ -757,6 +782,18 @@ class WasmModuleBuilder {
             section.emit_u32v(global.init_index);
           }
           section.emit_u8(kExprEnd);  // end of init expression
+        }
+      });
+    }
+
+    // Add exceptions.
+    if (wasm.exceptions.length > 0) {
+      if (debug) print("emitting events @ " + binary.length);
+      binary.emit_section(kEventSectionCode, section => {
+        section.emit_u32v(wasm.exceptions.length);
+        for (let type of wasm.exceptions) {
+          section.emit_u32v(kExceptionAttribute);
+          section.emit_u32v(type);
         }
       });
     }
