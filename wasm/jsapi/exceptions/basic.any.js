@@ -93,3 +93,33 @@ promise_test(async () => {
   const result = instance.exports.catch_exception();
   assert_equals(result, error);
 }, "Imported JS function throws");
+
+promise_test(async () => {
+  const kExprRethrow = 0x09;
+  const kWasmAnyRef = 0x6f;
+  const kSig_v_r = makeSig([kWasmAnyRef], []);
+  const kSig_r_v = makeSig([], [kWasmAnyRef]);
+  const builder = new WasmModuleBuilder();
+  const fnIndex = builder.addImport("module", "fn", kSig_v_v);
+  const except = builder.addException(kSig_v_r);
+  builder.addFunction("catch_and_rethrow", kSig_r_v)
+    .addBody([
+      kExprTry, kWasmStmt,
+        kExprCallFunction, fnIndex,
+      kExprCatch,
+        kExprRethrow,
+      kExprEnd,
+      kExprRefNull,
+    ])
+    .exportFunc();
+
+  const buffer = builder.toBuffer();
+
+  class MyError extends Error {};
+  const error = new MyError();
+  const fn = () => { throw error };
+  const {instance} = await WebAssembly.instantiate(buffer, {
+    module: { fn }
+  });
+  assert_throws(new MyError(), () => instance.exports.catch_and_rethrow());
+}, "Imported JS function throws, Wasm catches and rethrows");
