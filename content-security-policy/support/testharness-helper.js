@@ -28,6 +28,15 @@ function waitUntilCSPEventForEval(test, line) {
   });
 }
 
+function waitUntilCSPEventForTrustedTypes(test, line) {
+  return new Promise((resolve, reject) => {
+    self.addEventListener("securitypolicyviolation", test.step_func(e => {
+      if (e.blockedURI == "trusted-types" && e.lineNumber == line)
+        resolve(e);
+    }));
+  });
+}
+
 function waitUntilEvent(obj, name) {
   return new Promise((resolve, reject) => {
     obj.addEventListener(name, resolve);
