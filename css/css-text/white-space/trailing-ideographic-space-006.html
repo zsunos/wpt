@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>CSS Text level 3 Test: handling ideographic space at the end of line</title>
+<link rel="author" title="Javier Fernandez Garcia-Boente" href="mailto:jfernandez@igalia.com">
+<link rel="help" href="https://drafts.csswg.org/css-text-3/#white-space-phase-2">
+<link rel="match" href="reference/trailing-ideographic-space-005-ref.html">
+<meta name="assert" content="If 'white-space' is set to 'pre-wrap', an ideographic space (U+3000) sequence at the end of the line followed by forced break, must conditionally hang.">
+<style>
+div { line-height: 1; }
+.ref {
+    width: 6em;
+    height: 1em;
+    background: red;
+    position: absolute;
+    z-index: -1;
+}
+.test {
+    width: max-content;
+    background: white; /* If the spaces don't hang, there will be red */
+    white-space: pre-wrap;
+}
+</style>
+
+<p>Test passes if the characters below are arranged in a single line and if there is no red.
+<div class="ref">ふぇ</div>
+<div class="test"><div style="width: 3em">ふぇ&#x3000;&#x3000;&#x3000;&#x3000;</div></div>
