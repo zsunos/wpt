@@ -74,7 +74,7 @@ tasks:
               payload:
                 image:
                     harjgam/web-platform-tests:0.33
-                maxRunTime: 7200
+                maxRunTime: 9000
                 artifacts:
                   public/results:
                     path: /home/test/artifacts
