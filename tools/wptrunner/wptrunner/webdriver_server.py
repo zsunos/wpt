@@ -83,10 +83,7 @@ class WebDriverServer(object):
     def stop(self, force=False):
         self.logger.debug("Stopping WebDriver")
         if self.is_alive:
-            kill_result = self._proc.kill()
-            if force and kill_result != 0:
-                return self._proc.kill(9)
-            return kill_result
+            return self._proc.kill()
         return not self.is_alive
 
     @property
