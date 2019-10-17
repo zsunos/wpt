@@ -4,9 +4,12 @@ FROM ubuntu:18.04
 ENV DEBIAN_FRONTEND=noninteractive \
     DEBCONF_NONINTERACTIVE_SEEN=true
 
-# General requirements not in the base image
+# Update and upgrade.
 RUN apt-get -qqy update \
-  && apt-get -qqy install \
+  && apt-get -qqy upgrade
+
+# General requirements not in the base image
+RUN apt-get -qqy install \
     bridge-utils \
     bzip2 \
     ca-certificates \
