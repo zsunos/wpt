@@ -2,7 +2,7 @@
 
 structuredCloneBatteryOfTests = [];
 
-function check(description, input, callback) {
+function check(description, input, callback, requiresDocument = false) {
   testObjMock = {
     done() {},
     step_func(f) {return _ => f()},
@@ -17,7 +17,8 @@ function check(description, input, callback) {
       }
       const copy = await runner.structuredClone(newInput);
       await callback(copy, newInput, testObjMock);
-    }
+    },
+    requiresDocument
   });
 }
 
@@ -79,6 +80,8 @@ check('primitive number, 9007199254740992', 9007199254740992, compare_primitive)
 check('primitive number, -9007199254740992', -9007199254740992, compare_primitive);
 check('primitive number, 9007199254740994', 9007199254740994, compare_primitive);
 check('primitive number, -9007199254740994', -9007199254740994, compare_primitive);
+check('primitive BigInt, 1n', 1n, compare_primitive);
+check('primitive BigInt, 1000000000000000000000000n', 1000000000000000000000000n, compare_primitive);
 
 check('Array primitives', [undefined,
                            null,
@@ -98,7 +101,9 @@ check('Array primitives', [undefined,
                            9007199254740992,
                            -9007199254740992,
                            9007199254740994,
-                           -9007199254740994], compare_Array(enumerate_props(compare_primitive)));
+                           -9007199254740994,
+                           42n,
+                           90000000000000000000034243200n], compare_Array(enumerate_props(compare_primitive)));
 check('Object primitives', {'undefined':undefined,
                            'null':null,
                            'true':true,
@@ -134,7 +139,7 @@ check('Array Boolean objects', [new Boolean(true), new Boolean(false)], compare_
 check('Object Boolean objects', {'true':new Boolean(true), 'false':new Boolean(false)}, compare_Object(enumerate_props(compare_Boolean)));
 
 function compare_obj(what) {
-  var Type = window[what];
+  var Type = self[what];
   return function(actual, input, test_obj) {
     if (typeof actual === 'string')
       assert_unreached(actual);
@@ -191,6 +196,13 @@ check('Object Number objects', {'0.2':new Number(0.2),
                                '-9007199254740992':new Number(-9007199254740992),
                                '9007199254740994':new Number(9007199254740994),
                                '-9007199254740994':new Number(-9007199254740994)}, compare_Object(enumerate_props(compare_obj('Number'))));
+
+function compare_BigInt(actual, input, test_obj) {
+  assert_true(actual instanceof BigInt, 'instanceof BigInt');
+  assert_equals(actual.valueOf(), input.valueOf());
+  assert_not_equals(actual, input);
+}
+check('Object(42n)', Object(42n), compare_BigInt);
 
 function compare_Date(actual, input, test_obj) {
   if (typeof actual === 'string')
@@ -271,9 +283,9 @@ async function compare_Blob(actual, input, test_obj, expect_File) {
   assert_equals(actual.size, input.size, 'size');
   assert_equals(actual.type, input.type, 'type');
   assert_not_equals(actual, input);
-  const ab1 = new Response(actual).arrayBuffer();
-  const ab2 = new Response(input).arrayBuffer();
-  assert_equals(ab1.btyeLength, ab2.byteLength, 'byteLength');
+  const ab1 = await new Response(actual).arrayBuffer();
+  const ab2 = await new Response(input).arrayBuffer();
+  assert_equals(ab1.byteLength, ab2.byteLength, 'byteLength');
   const ta1 = new Uint8Array(ab1);
   const ta2 = new Uint8Array(ab2);
   for(let i = 0; i < ta1.size; i++) {
@@ -363,12 +375,12 @@ function func_FileList_empty() {
   input.type = 'file';
   return input.files;
 }
-check('FileList empty', func_FileList_empty, compare_FileList);
-check('Array FileList object, FileList empty', [func_FileList_empty()], compare_Array(enumerate_props(compare_FileList)));
-check('Object FileList object, FileList empty', {'x':func_FileList_empty()}, compare_Object(enumerate_props(compare_FileList)));
+check('FileList empty', func_FileList_empty, compare_FileList, true);
+check('Array FileList object, FileList empty', () => ([func_FileList_empty()]), compare_Array(enumerate_props(compare_FileList)), true);
+check('Object FileList object, FileList empty', () => ({'x':func_FileList_empty()}), compare_Object(enumerate_props(compare_FileList)), true);
 
 function compare_ArrayBufferView(view) {
-  var Type = window[view];
+  var Type = self[view];
   return function(actual, input, test_obj) {
     if (typeof actual === 'string')
       assert_unreached(actual);
@@ -397,7 +409,7 @@ function func_ImageData_1x1_transparent_black() {
   var ctx = canvas.getContext('2d');
   return ctx.createImageData(1, 1);
 }
-check('ImageData 1x1 transparent black', func_ImageData_1x1_transparent_black, compare_ImageData);
+check('ImageData 1x1 transparent black', func_ImageData_1x1_transparent_black, compare_ImageData, true);
 function func_ImageData_1x1_non_transparent_non_black() {
   var canvas = document.createElement('canvas');
   var ctx = canvas.getContext('2d');
@@ -408,11 +420,11 @@ function func_ImageData_1x1_non_transparent_non_black() {
   imagedata.data[3] = 103;
   return imagedata;
 }
-check('ImageData 1x1 non-transparent non-black', func_ImageData_1x1_non_transparent_non_black, compare_ImageData);
-check('Array ImageData object, ImageData 1x1 transparent black', [func_ImageData_1x1_transparent_black()], compare_Array(enumerate_props(compare_ImageData)));
-check('Array ImageData object, ImageData 1x1 non-transparent non-black', [func_ImageData_1x1_non_transparent_non_black()], compare_Array(enumerate_props(compare_ImageData)));
-check('Object ImageData object, ImageData 1x1 transparent black', {'x':func_ImageData_1x1_transparent_black()}, compare_Object(enumerate_props(compare_ImageData)));
-check('Object ImageData object, ImageData 1x1 non-transparent non-black', {'x':func_ImageData_1x1_non_transparent_non_black()}, compare_Object(enumerate_props(compare_ImageData)));
+check('ImageData 1x1 non-transparent non-black', func_ImageData_1x1_non_transparent_non_black, compare_ImageData, true);
+check('Array ImageData object, ImageData 1x1 transparent black', () => ([func_ImageData_1x1_transparent_black()]), compare_Array(enumerate_props(compare_ImageData)), true);
+check('Array ImageData object, ImageData 1x1 non-transparent non-black', () => ([func_ImageData_1x1_non_transparent_non_black()]), compare_Array(enumerate_props(compare_ImageData)), true);
+check('Object ImageData object, ImageData 1x1 transparent black', () => ({'x':func_ImageData_1x1_transparent_black()}), compare_Object(enumerate_props(compare_ImageData)), true);
+check('Object ImageData object, ImageData 1x1 non-transparent non-black', () => ({'x':func_ImageData_1x1_non_transparent_non_black()}), compare_Object(enumerate_props(compare_ImageData)), true);
 
 
 check('Array sparse', new Array(10), compare_Array(enumerate_props(compare_primitive)));
@@ -532,7 +544,8 @@ structuredCloneBatteryOfTests.push({
     const bm = await createImageBitmap(canvas);
     const copy = await runner.structuredClone(bm);
     compare_ImageBitmap(bm, copy);
-  }
+  },
+  requiresDocument: true
 });
 
 structuredCloneBatteryOfTests.push({
@@ -542,7 +555,8 @@ structuredCloneBatteryOfTests.push({
     const bm = await createImageBitmap(canvas);
     const copy = await runner.structuredClone(bm);
     compare_ImageBitmap(bm, copy);
-  }
+  },
+  requiresDocument: true
 });
 
 structuredCloneBatteryOfTests.push({
@@ -552,7 +566,8 @@ structuredCloneBatteryOfTests.push({
     const bm = [await createImageBitmap(canvas)];
     const copy = await runner.structuredClone(bm);
     compare_Array(enumerate_props(compare_ImageBitmap))(bm, copy);
-  }
+  },
+  requiresDocument: true
 });
 
 structuredCloneBatteryOfTests.push({
@@ -562,7 +577,8 @@ structuredCloneBatteryOfTests.push({
     const bm = [await createImageBitmap(canvas)];
     const copy = await runner.structuredClone(bm);
     compare_Array(enumerate_props(compare_ImageBitmap))(bm, copy);
-  }
+  },
+  requiresDocument: true
 });
 
 structuredCloneBatteryOfTests.push({
@@ -572,7 +588,8 @@ structuredCloneBatteryOfTests.push({
     const bm = {x: await createImageBitmap(canvas)};
     const copy = await runner.structuredClone(bm);
     compare_Object(enumerate_props(compare_ImageBitmap))(bm, copy);
-  }
+  },
+  requiresDocument: true
 });
 
 structuredCloneBatteryOfTests.push({
@@ -582,5 +599,6 @@ structuredCloneBatteryOfTests.push({
     const bm = {x: await createImageBitmap(canvas)};
     const copy = await runner.structuredClone(bm);
     compare_Object(enumerate_props(compare_ImageBitmap))(bm, copy);
-  }
+  },
+  requiresDocument: true
 });
