@@ -11,6 +11,8 @@ steps:
     echo "##vso[task.prependpath]$HOME/Library/Python/2.7/bin"
   displayName: 'Install Python packages (macOS)'
   condition: and(succeeded(), eq(variables['Agent.OS'], 'Darwin'))
+- script: which pip
+- script: pip --version
 - script: pip --disable-pip-version-check install --upgrade ${{ parameters.packages }}
   displayName: 'Install Python packages (Windows)'
   condition: and(succeeded(), eq(variables['Agent.OS'], 'Windows_NT'))
