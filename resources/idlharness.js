@@ -3109,7 +3109,7 @@ IdlInterfaceMember.prototype.is_to_json_regular_operation = function() {
 IdlInterfaceMember.prototype.toString = function() {
     function formatType(type) {
         if (type.generic) {
-            return type.generic + "<" + formatType(type.idlType) + ">";
+            return type.generic + "<" + type.idlType.map(formatType).join(", ") + ">";
         }
         return type.idlType;
     }
