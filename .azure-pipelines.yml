@@ -18,8 +18,7 @@
 #    https://docs.microsoft.com/en-us/azure/devops/pipelines/agents/v2-windows
 
 trigger:
-- epochs/*
-- triggers/*
+- foolip/catalina
 
 jobs:
 # The affected tests jobs are unconditional for speed, as most PRs have one or
@@ -73,8 +72,6 @@ jobs:
 
 - job: infrastructure_macOS
   displayName: 'infrastructure/ tests: macOS'
-  dependsOn: decision
-  condition: dependencies.decision.outputs['test_jobs.wptrunner_infrastructure']
   pool:
     vmImage: 'macOS-10.15'
   steps:
