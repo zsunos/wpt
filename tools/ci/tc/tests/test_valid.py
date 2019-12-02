@@ -63,7 +63,7 @@ def test_verify_payload():
         with open(data_path(filename)) as f:
             event = json.load(f)
 
-        with mock.patch("tools.ci.tc.decision.get_fetch_rev", return_value=(event["after"], None)):
+        with mock.patch("tools.ci.tc.decision.get_fetch_rev", return_value=(event["after"], None, None)):
             with mock.patch("tools.ci.tc.decision.get_run_jobs", return_value=set(jobs)):
                 task_id_map = decide(event)
         for name, (task_id, task_data) in task_id_map.items():
@@ -143,7 +143,7 @@ def test_verify_payload():
       'lint'}),
 ])
 def test_schedule_tasks(event_path, is_pr, files_changed, expected):
-    with mock.patch("tools.ci.tc.decision.get_fetch_rev", return_value=(is_pr, None)):
+    with mock.patch("tools.ci.tc.decision.get_fetch_rev", return_value=(None, None, None)):
         with mock.patch("tools.wpt.testfiles.repo_files_changed",
                         return_value=files_changed):
             with open(data_path(event_path)) as event_file:
