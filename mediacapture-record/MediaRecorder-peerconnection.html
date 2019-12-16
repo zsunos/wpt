@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>MediaRecorder peer connection</title>
+  <link rel="help"
+        href="https://w3c.github.io/mediacapture-record/MediaRecorder.html#dom-mediarecorder-mimeType">
+  <script src="/resources/testharness.js"></script>
+  <script src="/resources/testharnessreport.js"></script>
+</head>
+
+<body>
+  <video id="local" autoplay width="240" />
+  <video id="remote" autoplay width="240" />
+  <script>
+
+async function exchangeIceCandidates(pc1, pc2) {
+  function doExchange(localPc, remotePc) {
+    localPc.addEventListener('icecandidate', event => {
+      const { candidate } = event;
+      if (candidate && remotePc.signalingState !== 'closed') {
+        remotePc.addIceCandidate(candidate);
+      }
+    });
+  }
+  doExchange(pc1, pc2);
+  doExchange(pc2, pc1);
+}
+
+async function exchangeOfferAnswerRaw(pc1, pc2) {
+  await pc1.setLocalDescription(await pc1.createOffer());
+  await pc2.setRemoteDescription(pc1.localDescription);
+  await pc2.setLocalDescription(await pc2.createAnswer());
+  await pc1.setRemoteDescription(pc2.localDescription);
+}
+
+async function exchangeOfferAnswer(
+  remoteVideo, pc1, pc2, num_tracks, onstream) {
+  let tracks = [];
+  pc2.ontrack = e => {
+    tracks.push(e.track)
+    if (tracks.length < num_tracks) return;
+    const stream = new MediaStream(tracks);
+    remoteVideo.srcObject = stream;
+    onstream(pc1, pc2, stream)
+  }
+  exchangeOfferAnswerRaw(pc1, pc2);
+}
+
+function setTransceiverCodecPreference(transceiver, codecPreference) {
+  for (let codec of RTCRtpSender.getCapabilities('video').codecs) {
+    if (codec.mimeType.includes(codecPreference)) {
+      transceiver.setCodecPreferences([codec]);
+      return;
+    }
+  }
+}
+
+async function startConnection(
+    use_audio, use_video, onstream, videoCodecPreference) {
+  const localVideo = document.getElementById('local');
+  const remoteVideo = document.getElementById('remote');
+  const pc1 = new RTCPeerConnection();
+  const pc2 = new RTCPeerConnection();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    audio: use_audio, video: use_video
+  });
+  localVideo.srcObject = stream;
+  let transceivers = {};
+  stream.getTracks().forEach(track => {
+    const transceiver = pc1.addTransceiver(track);
+    transceivers[track.kind] = transceiver;
+    if (videoCodecPreference && track.kind == 'video') {
+      setTransceiverCodecPreference(transceiver, videoCodecPreference);
+    }
+  });
+  exchangeIceCandidates(pc1, pc2);
+  exchangeOfferAnswer(
+      remoteVideo, pc1, pc2, use_audio + use_video, (...args) => {
+          onstream(...args, transceivers); });
+}
+
+async function awaitNumSynchronizationSources(t, pc, num_sources, resolve) {
+  let count = 0;
+  pc.getTransceivers().forEach(transceiver => {
+    count += transceiver.receiver.getSynchronizationSources().length;
+  });
+  if (count == num_sources) {
+    resolve();
+    return;
+  }
+  t.step_timeout(() => {
+    awaitNumSynchronizationSources(t, pc, num_sources, resolve);
+  }, 100);
+}
+
+[["video", { video: true, audio: false }, ""],
+ ["audio", { video: false, audio: true }, ""],
+ ["audio/video", { video: true, audio: true }, ""],
+ ["audio", { video: false, audio: true }, "video/webm;codecs=vp8"],
+ ["video", { video: true, audio: false }, "video/webm;codecs=vp8"],
+ ["audio/video", { video: true, audio: true }, "video/webm;codecs=vp8"],
+ ["audio", { video: false, audio: true }, "video/webm;codecs=vp9"],
+ ["video", { video: true, audio: false }, "video/webm;codecs=vp9"],
+ ["audio/video", { video: true, audio: true }, "video/webm;codecs=vp9"]]
+  .forEach(args => {
+    const formatString = JSON.stringify(args[1]) +
+        " with format " + (args[2] ? args[2] : "passthrough") + ".";
+
+    promise_test(async t => {
+      let recorder;
+      let localPc;
+      let remotePc;
+      await new Promise(resolve => {
+        startConnection(
+          args[1].audio, args[1].video, (pc1, pc2, stream) => {
+            localPc = pc1;
+            remotePc = pc2;
+            recorder = new MediaRecorder(stream, { mimeType: args[2] });
+            awaitNumSynchronizationSources(
+                t, remotePc, args[1].audio + args[1].video, resolve);
+          });
+      });
+      const dataPromise = new Promise(resolve => {
+        recorder.onstart = () => {
+          recorder.ondataavailable = blob => {
+            resolve();
+          };
+        };
+      });
+      recorder.start();
+      await new Promise(r => { t.step_timeout(r, 500); })
+      recorder.stop();
+      await dataPromise;
+      localPc.close();
+      remotePc.close();
+    }, "PeerConnection MediaRecorder receives data after onstart, " +
+          formatString);
+
+    promise_test(async t => {
+      let recorder;
+      let localPc;
+      let remotePc;
+      await new Promise(resolve => {
+        startConnection(
+          args[1].audio, args[1].video, (pc1, pc2, stream) => {
+            localPc = pc1;
+            remotePc = pc2;
+            recorder = new MediaRecorder(stream);  // Passthrough recording
+            awaitNumSynchronizationSources(
+                t, remotePc, args[1].audio + args[1].video, resolve);
+          });
+      });
+      const stopPromise = new Promise(resolve => {
+        recorder.onstop = () => {
+          resolve();
+        };
+      });
+      const dataPromise = new Promise(resolve => {
+        recorder.ondataavailable = blob => {
+          if (blob.data.size) {
+            resolve();
+          }
+        };
+      });
+      recorder.start();
+      await new Promise(r => { t.step_timeout(r, 1000); })
+      remotePc.getTransceivers().forEach(
+        transceiver => { transceiver.receiver.track.stop(); });
+      // As the tracks ended, we'd like to see data from the recorder.
+      // For details:
+      // https://www.w3.org/TR/mediastream-recording/#mediarecorder-methods,
+      // bullet 6
+      await dataPromise;
+      await stopPromise;
+      localPc.close();
+      remotePc.close();
+    }, "PeerConnection MediaRecorder gets ondata on stopping recorded " +
+           "tracks " + formatString);
+  });
+
+  /*
+    Switch codec mid-flight for passthrough
+    */
+  promise_test(async t => {
+    let recorder;
+    let localPc;
+    let remotePc;
+    let transceivers;
+    await new Promise(resolve => {
+      startConnection(
+        /*audio=*/false, /*video=*/true,
+        (pc1, pc2, stream, transceiverDict) => {
+          localPc = pc1;
+          remotePc = pc2;
+          recorder = new MediaRecorder(stream);  // Passthrough.
+          transceivers = transceiverDict;
+          t, awaitNumSynchronizationSources(remotePc, 1, resolve);
+        }, /*videoCodecPreference=*/"VP8");
+    });
+    recorder.start();
+    errorPromise = new Promise(resolve => {
+      recorder.onerror = () => {
+        resolve();
+      }
+    });
+    await new Promise(r => { t.step_timeout(r, 500); })
+
+    // Switch codec to VP9; we expect onerror to be invoked.
+    setTransceiverCodecPreference(transceivers.video, "VP9");
+    exchangeOfferAnswerRaw(localPc, remotePc);
+    await errorPromise;
+  }, "PeerConnection passthrough MediaRecorder invokes onerror when the " +
+         "codec switches from VP8 to VP9");
+
+[["video",       { audio: false },  "VP8", /.*vp8.*/],
+ ["audio/video", { audio: true },   "VP8", /.*vp8.*/],
+ ["video",       { audio: false },  "VP9", /.*vp9.*/],
+ ["audio/video", { audio: true },   "VP9", /.*vp9.*/]]
+  .forEach(args => {
+    promise_test(async t => {
+      let recorder;
+      let localPc;
+      let remotePc;
+      await new Promise(resolve => {
+        startConnection(
+          args[1].audio, /*video=*/true, (pc1, pc2, stream, transceivers) => {
+            localPc = pc1;
+            remotePc = pc2;
+            recorder = new MediaRecorder(stream);  // Passthrough
+            resolve();
+          }, /*videoCodecPreference=*/args[2]);
+      });
+      const onstartPromise = new Promise(resolve => {
+        recorder.onstart = () => {
+          assert_regexp_match(
+                recorder.mimeType, args[3],
+                "mimeType is matching " + args[2] + " in case of passthrough.");
+          resolve();
+        };
+      });
+      recorder.start();
+      await(onstartPromise);
+      localPc.close();
+      remotePc.close();
+    }, "PeerConnection passthrough MediaRecorder receives " + args[2] +
+          " after onstart with a " + args[0] + " stream.");
+  });
+
+  </script>
+</body>
+
+</html>
