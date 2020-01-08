@@ -83,6 +83,11 @@
               'audio/mp4;codecs="opus"',
               'video/mp4;codecs="opus"'
           ], true, 'Test valid MP4 type');
+
+          test_type_support([
+              'audio/webm;codecs=vorbis;test="6"'
+          ], true, 'Test valid token type codec ID in multi parameter');
+
         </script>
     </body>
 </html>
