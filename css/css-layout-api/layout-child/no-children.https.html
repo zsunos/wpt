@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html class=reftest-wait>
+<link rel="help" href="https://drafts.css-houdini.org/css-layout-api/#layout-children">
+<link rel="match" href="no-children-ref.html">
+<meta name="assert" content="This test checks that having no children does not break custom layouts." />
+
+<style>
+.test {
+  background: red;
+  width: 100px;
+}
+
+@supports (display: layout(test)) {
+  .test {
+    background: green;
+    display: layout(test);
+  }
+}
+</style>
+<script src="/common/reftest-wait.js"></script>
+<script src="/common/worklet-reftest.js"></script>
+
+<div class="test">No children.</div>
+
+<script id="code" type="text/worklet">
+registerLayout('test', class {
+  async intrinsicSizes() {}
+  async layout(children, edges, constraints, styleMap) {
+    return {
+      childFragments: await Promise.all(
+        children.map(child => child.layoutNextFragment()),
+      ),
+    };
+  }
+});
+</script>
+
+<script>
+importWorkletAndTerminateTestAfterAsyncPaint(CSS.layoutWorklet, document.getElementById('code').textContent);
+</script>
