@@ -17,10 +17,18 @@ promise_test(async t => {
       resolve();
     };
   });
+  let closing_seen = false;
+  channel1.onclosing = t.unreached_func();
+  channel2.onclosing = event => {
+    assert_equals(channel2.readyState, 'closing');
+    closing_seen = true;
+  }
   channel2.addEventListener('error', t.unreached_func());
   channel1.close();
   await close_handler;
-}, 'Close datachannel causes onclose to be called');
+  assert_equals(channel2.readyState, 'closed');
+  assert_true(closing_seen, 'Closing event was seen');
+}, 'Close datachannel causes onclosing and onclose to be called');
 
 promise_test(async t => {
   // This is the same test as above, but using addEventListener
@@ -33,10 +41,18 @@ promise_test(async t => {
       resolve();
     });
   });
+  let closing_seen = false;
+  channel1.addEventListener('closing', t.unreached_func());
+  channel2.addEventListener('closing', event => {
+    assert_equals(channel2.readyState, 'closing');
+    closing_seen = true;
+  });
   channel2.addEventListener('error', t.unreached_func());
   channel1.close();
   await close_handler;
-}, 'Close datachannel causes close event to be called');
+  assert_equals(channel2.readyState, 'closed');
+  assert_true(closing_seen, 'Closing event was seen');
+}, 'Close datachannel causes closing and close event to be called');
 
 promise_test(async t => {
   let pc1 = new RTCPeerConnection();
