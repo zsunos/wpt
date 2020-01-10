@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+<script src="/resources/testharness.js"></script>
+<script src="/resources/testharnessreport.js"></script>
+</head>
+<body>
+<script>
+promise_test(t => {
+  return new Promise((resolve, reject) => {
+    const url = "resources/status-code.py?status=404&type=img";
+
+    performance.clearResourceTimings();
+    const el = document.createElement("object");
+    const po = new PerformanceObserver(t.step_func(e => {
+      assert_greater_than(e.getEntriesByType("resource").length, 0, "Got a performance entry");
+      resolve();
+    }));
+    po.observe({entryTypes: ["resource"]});
+    el.data = url;
+    el.type = "image/png";
+    el.style = "width: 0px; height: 0px;";
+    document.body.appendChild(el);
+
+    el.onload = el.onerror = t.step_timeout(() => {
+      assert_unreached();
+      reject();
+    }, 500);
+  });
+}, "Test that an image object with a 404 response displays an entry");
+
+promise_test(t => {
+  return new Promise((resolve, reject) => {
+    const url = "resources/status-code.py?status=404&type=none";
+
+    performance.clearResourceTimings();
+    const el = document.createElement("object");
+    const po = new PerformanceObserver(t.step_func(e => {
+      assert_greater_than(e.getEntriesByType("resource").length, 0, "Got a performance entry");
+      resolve();
+    }));
+    po.observe({entryTypes: ["resource"]});
+    el.data = url;
+    el.style = "width: 0px; height: 0px;";
+    document.body.appendChild(el);
+
+    el.onload = el.onerror = t.step_timeout(() => {
+      assert_unreached();
+      reject();
+    }, 500);
+  });
+}, "Test that an no-type object with a 404 response displays an entry");
+
+promise_test(t => {
+  return new Promise((resolve, reject) => {
+    const url = "resources/status-code.py?status=200&type=none";
+
+    performance.clearResourceTimings();
+    const el = document.createElement("object");
+    const po = new PerformanceObserver(t.step_func(e => {
+      assert_greater_than(e.getEntriesByType("resource").length, 0, "Got a performance entry");
+      resolve();
+    }));
+    po.observe({entryTypes: ["resource"]});
+    el.data = url;
+    el.style = "width: 0px; height: 0px;";
+    document.body.appendChild(el);
+
+    el.onload = el.onerror = t.step_timeout(() => {
+      assert_unreached();
+      reject();
+    }, 500);
+  });
+}, "Test that an no-type object with a 200 response displays an entry");
+</script>
