@@ -136,15 +136,30 @@
     const encodings = ['utf-8', 'utf-16', 'utf-16be', 'utf-16le'];
     for (const encoding of encodings) {
       const lang = 'fr';
-      const record = new NDEFRecord(createTextRecord(test_text_data, encoding, lang));
-      assert_equals(record.recordType, 'text', 'recordType');
-      assert_equals(record.mediaType, null, 'mediaType');
-    assert_equals(record.id, test_record_id, 'id');
-      assert_equals(record.encoding, encoding, 'encoding');
-      assert_equals(record.lang, lang, 'lang');
-      const decoder = new TextDecoder();
-      assert_equals(decoder.decode(record.data), test_text_data,
-          'data has the same content with the original dictionary');
+
+      {
+        const record = new NDEFRecord(createTextRecord(test_text_data, encoding, lang));
+        assert_equals(record.recordType, 'text', 'recordType');
+        // If NDEFRecordInit#data is a DOMString, we ignore NDEFRecordInit#encoding
+        // and always encode it as utf-8.
+        assert_equals(record.encoding, 'utf-8', 'encoding');
+        assert_equals(record.lang, lang, 'lang');
+        const decoder = new TextDecoder();
+        assert_equals(decoder.decode(record.data), test_text_data,
+            'data has the same content with the original text');
+      }
+
+      {
+        const record = new NDEFRecord(createTextRecord(encodeTextToArrayBuffer(
+                test_text_data, encoding), encoding, lang));
+        assert_equals(record.recordType, 'text', 'recordType');
+        // If NDEFRecordInit#data is a BufferSource, NDEFRecordInit#encoding is used.
+        assert_equals(record.encoding, encoding, 'encoding');
+        assert_equals(record.lang, lang, 'lang');
+        const decoder = new TextDecoder(record.encoding);
+        assert_equals(decoder.decode(record.data), test_text_data,
+            'data has the same content with the original text. encoding: ' + encoding);
+      }
     }
   }, 'NDEFRecord constructor with text record type, encoding, and lang');
 
