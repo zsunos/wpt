@@ -74,16 +74,9 @@ dictionary NDEFReadingEventInit : EventInit {
 };
 
 dictionary NDEFPushOptions {
-  NDEFPushTarget target = "any";
   boolean ignoreRead = true;
   boolean overwrite = true;
   AbortSignal? signal;
-};
-
-enum NDEFPushTarget {
-  "tag",
-  "peer",
-  "any"
 };
 
 dictionary NDEFScanOptions {
